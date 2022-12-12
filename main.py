@@ -15,8 +15,12 @@ def main():
         fileSystem.currentFile[0].name + \
         ' mode: ' + \
         fileSystem.currentFile[1] if fileSystem.currentFile[0] is not None else ''
-    userInput = input(
-        f'{fileSystem.getPathToCurrentDir()} {currFileString}  $ ')
+    try:
+        userInput = input(
+            f'{fileSystem.getPathToCurrentDir()} {currFileString}  $ ')
+    except (EOFError,KeyboardInterrupt):
+        quit()
+    
     while(userInput != 'shutdown'):
         splittedText = userInput.split()
         command = splittedText[0]
@@ -73,8 +77,12 @@ def main():
             fileSystem.currentFile[0].name + \
             ' mode: ' + \
             fileSystem.currentFile[1] if fileSystem.currentFile[0] is not None else ''
-        userInput = input(
-            f'{fileSystem.getPathToCurrentDir()} {currFileString} $ ')
+        try:
+            userInput = input(
+                f'{fileSystem.getPathToCurrentDir()} {currFileString} $ ')
+        except (EOFError, KeyboardInterrupt):
+            print('\nClosing without saving...')
+            quit()
 
     # Closing open files if any
     fileSystem.currentFile = (None, None)
