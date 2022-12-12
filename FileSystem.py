@@ -158,8 +158,11 @@ class FileSystem:
             print(" " * level, currentNode.name)
             childNodes = currentNode.children
         else:
+            blockMapping = str(
+                currentNode['node'].dataPointers) if currentNode['nodeType'] == 'file' else ''
             print(" " * level,
-                  currentNode['nodeType'] + '->' + currentNode['nodeName'])
+                  currentNode['nodeType'] + '->' + currentNode['nodeName'] + blockMapping)
+
             if currentNode['nodeType'] == 'dir':
                 childNodes = currentNode['node'].children
 
