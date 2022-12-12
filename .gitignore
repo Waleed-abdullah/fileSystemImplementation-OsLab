@@ -1,2 +1,4 @@
 # python .gitignores
 __pycache__/
+notes.txt
+test.py
