@@ -83,8 +83,7 @@ def main():
                 f'{fileSystem.getPathToCurrentDir()} {currFileString} $ ')
         except (EOFError, KeyboardInterrupt):
             print('\nClosing without saving...')
-            quit()
-
+            exit()
     # Closing open files if any
     fileSystem.currentFile = (None, None)
     with open('./fileSystem.dat', 'wb') as fs:
