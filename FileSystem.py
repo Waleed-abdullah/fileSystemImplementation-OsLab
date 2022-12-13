@@ -9,37 +9,38 @@ class FileSystem:
 
     def __init__(self):
         self.root = DirectoryNode('root')
-        self.currentDir = self.root
+        self.currentDir = [self.root]
         self.blocks = [{'usedSize': 0, 'data': ''}
                        for _ in range(TOTAL_BLOCKS)]
         # 1 means the block is occupied and 0 means that it is free
         self.freeBlocks = [0] * TOTAL_BLOCKS
         self.numFreeBlocks = TOTAL_BLOCKS
         # idx 0 indicates fileNode, idx 1 indicates the mode
-        self.currentFile = (None, None)
+        self.currentFile = [(None, None)]
 
-    def createDir(self, newDirName):
-        return self.currentDir.createDirectory(newDirName)
+    def createDir(self, newDirName, thread=0):
+        return self.currentDir[thread].createDirectory(newDirName)
 
-    def openFile(self, fileName, mode):
-        self.currentFile = (self.currentDir.getFile(fileName), mode)
-        if self.currentFile[0] == None:
-            self.currentFile = (None, None)
+    def openFile(self, fileName, mode, thread=0):
+        self.currentFile[thread] = (
+            self.currentDir[thread].getFile(fileName), mode)
+        if self.currentFile[thread][0] == None:
+            self.currentFile[thread] = (None, None)
             return "File does not exist"
         else:
             return "File opened"
 
-    def close(self, fileName):
-        if self.currentFile[0].name == fileName:
-            self.currentFile = (None, None)
+    def closeFile(self, fileName, thread=0):
+        if self.currentFile[thread][0].name == fileName:
+            self.currentFile[thread] = (None, None)
             return "Closed File"
         else:
             return 'This file is not open'
 
-    def write_to_file(self, writeAt, text):
+    def write_to_file(self, writeAt, text, thread=0):
         if len(text) == 0:
             return "Empty text"
-        fileNode, mode = self.currentFile[0], self.currentFile[1]
+        fileNode, mode = self.currentFile[thread][0], self.currentFile[thread][1]
         if fileNode is None:
             return "No file"
         if mode == 'r':
@@ -116,8 +117,8 @@ class FileSystem:
 
         self.allocate_and_fill_Blocks(fileNode, text)
 
-    def read_from_file(self, start=0, size=float('inf')):
-        fileNode, mode = self.currentFile[0], self.currentFile[1]
+    def read_from_file(self, start=0, size=float('inf'), thread=0):
+        fileNode, mode = self.currentFile[thread][0], self.currentFile[thread][1]
         if fileNode is None:
             return "No file"
         if mode == 'w' or mode == 'a':
@@ -146,28 +147,34 @@ class FileSystem:
                 remainingSize -= block['usedSize']
         return readData
 
-    def createFile(self, name):
-        return self.currentDir.createFile(name)
+    def createFile(self, name, thread):
+        return self.currentDir[thread].createFile(name)
 
     def showMemoryMap(self):
-        self.showMemoryMapHelper(self.root)
+        output = ''
+        self.showMemoryMapHelper(self.root, output)
+        return output
 
-    def showMemoryMapHelper(self, currentNode, level=0):
+    def showMemoryMapHelper(self, currentNode, output, level=0):
         childNodes = []
         if type(currentNode) != type({}):
-            print(" " * level, currentNode.name)
+            output += " " * level, currentNode.name + '\n'
             childNodes = currentNode.children
         else:
-            print(" " * level,
-                  currentNode['nodeType'] + '->' + currentNode['nodeName'])
+            blockMapping = str(
+                currentNode['node'].dataPointers) if currentNode['nodeType'] == 'file' else ''
+            output += " " * level, currentNode['nodeType'] + '->' + \
+                currentNode['nodeName'] + ' ' + blockMapping + '\n'
+
             if currentNode['nodeType'] == 'dir':
                 childNodes = currentNode['node'].children
 
         for childNode in childNodes:
             self.showMemoryMapHelper(childNode, level + 1)
 
-    def deleteNode(self, name):
-        childNode, idxInChildNodes = self.currentDir.getNodeToBeDeleted(name)
+    def deleteNode(self, name, thread=0):
+        childNode, idxInChildNodes = self.currentDir[thread].getNodeToBeDeleted(
+            name)
         if childNode == -1:
             return 'Node not found in current dir'
 
@@ -176,7 +183,7 @@ class FileSystem:
         if childNode['nodeType'] == 'file':
             self.deallocateBlocksFromFile(currentNode)
 
-        self.currentDir.children.pop(idxInChildNodes)
+        self.currentDir[thread].children.pop(idxInChildNodes)
         return 'Deleted node'
 
     def deallocateBlocksFromFile(self, fileNode):
@@ -190,15 +197,15 @@ class FileSystem:
             self.numFreeBlocks += 1
         return 'DeAllocated blocks'
 
-    def changeDirectory(self, name):
-        newDir = self.currentDir.getDir(name)
-        self.currentDir = newDir if newDir is not None else self.currentDir
-        return 'Dir doesnt exist' if newDir is None else self.currentDir.name
+    def changeDirectory(self, name, thread=0):
+        newDir = self.currentDir[thread].getDir(name)
+        self.currentDir[thread] = newDir if newDir is not None else self.currentDir[thread]
+        return 'Dir doesnt exist' if newDir is None else self.currentDir[thread].name
 
-    def move(self, source_name, dest_name):
+    def move(self, source_name, dest_name, thread=0):
         if source_name == 'root':
             return 'Cannot Move root node'
-        currentDirChildren = self.currentDir.children
+        currentDirChildren = self.currentDir[thread].children
 
         sourceNode = None
         sourceNodeIdx = None
@@ -209,9 +216,9 @@ class FileSystem:
         if sourceNode is None:
             return 'file doesnt exist in current directory'
 
-        if self.currentDir != self.root and dest_name == self.currentDir.parent.name:
-            self.currentDir.parent.children.append(sourceNode)
-            self.currentDir.children.pop(sourceNodeIdx)
+        if self.currentDir[thread] != self.root and dest_name == self.currentDir[thread].parent.name:
+            self.currentDir[thread].parent.children.append(sourceNode)
+            self.currentDir[thread].children.pop(sourceNodeIdx)
             return 'Moved'
 
         directories = self.getDirNodes()
@@ -241,19 +248,19 @@ class FileSystem:
             nodes[currentNode.name] = currentNode
         return nodes
 
-    def move_within_file(self, start, size, target):
+    def move_within_file(self, start, size, target, thread=0):
         data = self.read_from_file()
         dataToMove = data[start:size]
         newData = data[:start] + data[start + size: target] + \
             dataToMove + data[target:]
-        fileNode, prevMode = self.currentFile
-        self.currentFile = (fileNode, 'w')
+        fileNode, prevMode = self.currentFile[thread]
+        self.currentFile[thread] = (fileNode, 'w')
         self.write_to_file(newData)
-        self.currentFile = (fileNode, prevMode)
+        self.currentFile[thread] = (fileNode, prevMode)
         return 'Moved Data'
 
-    def trucate_file(self):
-        fileNode, mode = self.currentFile
+    def trucate_file(self, thread=0):
+        fileNode, mode = self.currentFile[thread]
         if fileNode is None:
             return 'No opened file'
         if mode == 'r':
@@ -262,19 +269,21 @@ class FileSystem:
         self.deallocateBlocksFromFile(fileNode)
         return 'truncated File'
 
-    def getPathToCurrentDir(self):
+    def getPathToCurrentDir(self, thread=0):
         path = []
-        tempDir = self.currentDir
+        tempDir = self.currentDir[thread]
         while tempDir is not None:
             path.append(tempDir.name)
             tempDir = tempDir.parent
         path.reverse()
         return '/'.join(path)
 
-    def listCurrentChildren(self):
-        for children in self.currentDir.children:
+    def listCurrentChildren(self, thread=0):
+        outputString = ''
+        for children in self.currentDir[thread].children:
             nodeType, nodeName = children['nodeType'], children['nodeName']
-            print(f'Type: {nodeType}, name: {nodeName}')
+            outputString += f'Type: {nodeType}, name: {nodeName}\n'
+        return outputString
 
     # for absolute path implementation
     def getNodeFromPath(self):
