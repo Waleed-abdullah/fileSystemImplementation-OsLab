@@ -87,7 +87,7 @@ def main():
         fileSystem = FileSystem()
 
     # handle threads
-    numThreads = int(sys.argv[1])
+    numThreads = int(sys.argv[1]) if len(sys.argv) > 1 else 4
 
     # create a different directory and file pointer for each thread
     fileSystem.currentDir = [fileSystem.root] * numThreads
