@@ -9,17 +9,18 @@ import concurrent.futures
 def thread_function(threadNum, fileSystem, commands, outputAtThread):
     for userCommand in commands:
         currFileString = ', currFile: ' + \
-            fileSystem.currentFile[0].name + \
+            fileSystem.currentFile[threadNum][0].name + \
             ' mode: ' + \
-            fileSystem.currentFile[1] if fileSystem.currentFile[0] is not None else ''
-        prompt = f'{fileSystem.getPathToCurrentDir()} {currFileString} $ ' + \
+            fileSystem.currentFile[threadNum][1] if fileSystem.currentFile[threadNum][0] is not None else ''
+        prompt = f'{fileSystem.getPathToCurrentDir(threadNum)} {currFileString} $ ' + \
             userCommand
         outputAtThread.append(prompt)
         splittedText = userCommand.split()
         command = splittedText[0]
         match command:
             case 'ls':
-                outputAtThread.append(fileSystem.listCurrentChildren())
+                outputAtThread.append(
+                    fileSystem.listCurrentChildren(threadNum))
             case 'cd':
                 if len(splittedText) == 2:
                     outputAtThread.append(
@@ -93,22 +94,36 @@ def main():
     fileSystem.currentFile = [(None, None) for _ in range(numThreads)]
 
     # create lists to store the input commands and the output of executing each thread
-    inputCommandsAtThread = [] * numThreads
+    inputCommandsAtThread = [None for _ in range(numThreads)]
     outputAtThread = [[] for _ in range(numThreads)]
 
     for threadNum in range(numThreads):
-        threadFileName = f'input_thread{threadNum}.txt'
-        with open(threadFileName, 'r') as threadFile:
+        threadFileName = f'input_thread{threadNum + 1}.txt'
+        with open('./input/' + threadFileName, 'r') as threadFile:
             inputCommandsAtThread[threadNum] = threadFile.readlines()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=numThreads) as executor:
-        for threadNum in range(numThreads):
-            executor.submit(thread_function, threadNum, fileSystem,
-                            inputCommandsAtThread[threadNum], outputAtThread[threadNum])
+    # with concurrent.futures.ThreadPoolExecutor(max_workers=numThreads) as executor:
+    #     for threadNum in range(numThreads):
+    #         executor.submit(thread_function, threadNum, fileSystem,
+    #                         inputCommandsAtThread[threadNum], outputAtThread[threadNum])
 
+    threads = []
+    for numThread in range(numThreads):
+        x = threading.Thread(target=thread_function,
+                             args=(numThread, fileSystem, inputCommandsAtThread[numThread], outputAtThread[numThread]))
+        threads.append(x)
+        x.start()
+
+    for index, thread in enumerate(threads):
+        thread.join()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=numThreads) as executor:
+        executor.map(thread_function, range(numThreads))
+
+    # print(outputAtThread)
     for threadNum in range(numThreads):
-        outputThreadFileName = f'output_thread{threadNum}.txt'
-        with open(outputThreadFileName, 'w') as threadFile:
+        outputThreadFileName = f'output_thread{threadNum + 1}.txt'
+        with open('./output/' + outputThreadFileName, 'w') as threadFile:
             for line in outputAtThread[threadNum]:
                 threadFile.write(line + '\n')
 

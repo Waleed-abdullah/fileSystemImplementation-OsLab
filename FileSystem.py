@@ -151,26 +151,29 @@ class FileSystem:
         return self.currentDir[thread].createFile(name)
 
     def showMemoryMap(self):
-        output = ''
+        output = []
         self.showMemoryMapHelper(self.root, output)
-        return output
+        return ''.join(output)
 
     def showMemoryMapHelper(self, currentNode, output, level=0):
         childNodes = []
         if type(currentNode) != type({}):
-            output += " " * level, currentNode.name + '\n'
+            lineToBePrinted = " " * level + currentNode.name + '\n'
+            output.append(lineToBePrinted)
             childNodes = currentNode.children
         else:
             blockMapping = str(
                 currentNode['node'].dataPointers) if currentNode['nodeType'] == 'file' else ''
-            output += " " * level, currentNode['nodeType'] + '->' + \
+            lineToBePrinted = " " * \
+                level + currentNode['nodeType'] + '->' + \
                 currentNode['nodeName'] + ' ' + blockMapping + '\n'
+            output.append(lineToBePrinted)
 
             if currentNode['nodeType'] == 'dir':
                 childNodes = currentNode['node'].children
 
         for childNode in childNodes:
-            self.showMemoryMapHelper(childNode, level + 1)
+            self.showMemoryMapHelper(childNode, output, level + 1)
 
     def deleteNode(self, name, thread=0):
         childNode, idxInChildNodes = self.currentDir[thread].getNodeToBeDeleted(
