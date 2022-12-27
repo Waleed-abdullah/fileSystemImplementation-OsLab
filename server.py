@@ -85,6 +85,7 @@ def multi_client(connection, fileSystem, threadNum):
             case other:
                 connection.sendall(str.encode('command not recognized'))
     connection.close()
+    dumpFileSystem(fileSystem, threadNum)
     threadCount -= 1
     threadOccupancy[threadNum] = False
 
