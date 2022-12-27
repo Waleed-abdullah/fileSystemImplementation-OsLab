@@ -1,9 +1,12 @@
 from DirectoryNode import DirectoryNode
 import math
+from RWLock import RWLock
+
 TOTAL_MEM = 2**10
 BLOCK_SIZE = 20
 TOTAL_BLOCKS = TOTAL_MEM // BLOCK_SIZE
 
+rwlock = RWLock()
 
 class FileSystem:
 
@@ -252,13 +255,21 @@ class FileSystem:
         return nodes
 
     def move_within_file(self, start, size, target, thread=0):
+
+        rwlock.acquire_readlock()
         data = self.read_from_file()
+        rwlock.release_readlock()
+
         dataToMove = data[start:size]
         newData = data[:start] + data[start + size: target] + \
             dataToMove + data[target:]
         fileNode, prevMode = self.currentFile[thread]
         self.currentFile[thread] = (fileNode, 'w')
+
+        rwlock.acquire_writelock()
         self.write_to_file(newData)
+        rwlock.release_writelock()
+        
         self.currentFile[thread] = (fileNode, prevMode)
         return 'Moved Data'
 

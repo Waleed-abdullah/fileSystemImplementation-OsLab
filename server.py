@@ -4,6 +4,9 @@ import os
 import sys
 from _thread import start_new_thread
 import socket
+from RWLock import RWLock
+
+rwlock = RWLock()
 
 
 def multi_client(connection, fileSystem, threadNum):
@@ -51,19 +54,35 @@ def multi_client(connection, fileSystem, threadNum):
                 connection.sendall(str.encode(
                     fileSystem.closeFile(splittedText[1], threadNum)))
             case 'write_to_file':
+                rwlock.acquire_writelock()
                 if splittedText[1].isdigit():
-                    connection.sendall(str.encode(fileSystem.write_to_file(
-                        int(splittedText[1]), ' '.join(splittedText[2:]), threadNum)))
-                else:
-                    connection.sendall(str.encode(fileSystem.write_to_file(
-                        None, ' '.join(splittedText[1:]), threadNum)))
-            case 'read_from_file':
-                if len(splittedText) > 1:
-                    connection.sendall(str.encode(fileSystem.read_from_file(
-                        splittedText[1], splittedText[2] if len(splittedText) == 3 else float('inf'), threadNum)))
+                    connection.sendall(str.encode(
+                        fileSystem.write_to_file(
+                            int(splittedText[1]), ' '.join(splittedText[2:]), threadNum
+                        )
+                    ))
                 else:
                     connection.sendall(str.encode(
-                        fileSystem.read_from_file(thread=threadNum)))
+                        fileSystem.write_to_file(
+                            None, ' '.join(splittedText[1:]), threadNum
+                        )
+                    ))
+                rwlock.release_writelock()
+            case 'read_from_file':
+                rwlock.acquire_readlock()
+                if len(splittedText) > 1:
+                    connection.sendall(str.encode(
+                        fileSystem.read_from_file(
+                            splittedText[1], 
+                            splittedText[2] if len(splittedText) == 3 else float('inf'),
+                            threadNum
+                        )
+                    ))
+                else:
+                    connection.sendall(str.encode(
+                        fileSystem.read_from_file(thread=threadNum)
+                    ))
+                rwlock.release_readlock()
             case 'move_within_file':
                 if len(splittedText) < 4:
                     connection.sendall(str.encode(
@@ -86,6 +105,7 @@ def multi_client(connection, fileSystem, threadNum):
                 connection.sendall(str.encode('command not recognized'))
     connection.close()
     dumpFileSystem(fileSystem, threadNum)
+    global threadCount
     threadCount -= 1
     threadOccupancy[threadNum] = False
 
@@ -132,10 +152,13 @@ def server():
     except socket.error as e:
         print(str(e))
 
-    print('Socket is Listening')
+    print('Server is Listening...')
     serverSideSocket.listen(numThreads)
     while True:
-        client, address = serverSideSocket.accept()
+        try:
+            client, address = serverSideSocket.accept()
+        except KeyboardInterrupt:
+            exit()
         if threadCount == numThreads:
             client.sendall(str.encode(
                 'Connection ports are full try again after some time'))
