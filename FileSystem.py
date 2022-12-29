@@ -280,7 +280,9 @@ class FileSystem:
         if mode == 'r':
             return 'cannot truncate in read mode'
         # de allocate all blocks and their data
+        self.acquire_writelock()
         self.deallocateBlocksFromFile(fileNode)
+        self.release_writelock()
         return 'truncated File'
 
     def getPathToCurrentDir(self, thread=0):
